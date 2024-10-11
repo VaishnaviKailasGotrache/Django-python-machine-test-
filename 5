@@ -1,0 +1,40 @@
+To implement the DELETE /clients/:id endpoint, the default ModelViewSet in Django REST Framework already provides support for this operation. The main focus here is ensuring the client is properly deleted and that the response status code is 204 No Content, as requested.
+
+Steps to Implement
+
+1. Client ViewSet
+
+In api/views.py, the ClientViewSet already inherits from ModelViewSet, which provides a destroy method that handles DELETE requests. Therefore, you do not need to override this method unless additional logic is required.
+
+Here’s the ClientViewSet again for reference:
+
+from rest_framework import viewsets
+from rest_framework.permissions import IsAuthenticated
+from .models import Client
+from .serializers import ClientSerializer
+
+class ClientViewSet(viewsets.ModelViewSet):
+    queryset = Client.objects.all()
+    serializer_class = ClientSerializer
+    permission_classes = [IsAuthenticated]
+
+	•	ModelViewSet: The destroy() method is already built-in, and by default, it will return a 204 status code after successfully deleting a client.
+	•	IsAuthenticated: Ensures that only authenticated users can delete a client.
+
+2. Testing the DELETE Request
+
+To delete a client, make a DELETE request to /clients/:id.
+
+Example Using cURL:
+
+curl -X DELETE http://localhost:8000/api/clients/3/ \
+-H "Authorization: Token <your_token>"
+
+3. Expected Output
+
+When the client is successfully deleted, the server will respond with a 204 No Content status code, and no response body will be returned.
+
+Summary:
+
+	•	The DELETE /clients/:id endpoint will delete the specified client.
+	•	After a successful deletion, the API will return a 204 No Content status code, which indicates that the request was successfully processed but there’s no additional content to return.
