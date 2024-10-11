@@ -1,0 +1,90 @@
+To implement the GET /projects/ endpoint that returns all projects assigned to the logged-in user, follow these steps:
+
+Steps to Implement
+
+1. Create a Serializer for Projects
+
+We need to create a serializer that provides the details of each project assigned to the user. This will include the project ID, name, created timestamp, and the user who created it.
+
+from rest_framework import serializers
+from .models import Project
+
+class ProjectListSerializer(serializers.ModelSerializer):
+    created_by = serializers.CharField(source='created_by.username', read_only=True)
+
+    class Meta:
+        model = Project
+        fields = ['id', 'name', 'created_at', 'created_by']
+
+	•	created_by: Displays the username of the user who created the project.
+	•	fields: Includes only the necessary fields (ID, name, created_at, and created_by).
+
+2. Create the View for Project Listing
+
+In api/views.py, we will add a view that filters projects assigned to the logged-in user. This will retrieve only those projects where the logged-in user is one of the assigned users.
+
+from rest_framework import viewsets
+from rest_framework.permissions import IsAuthenticated
+from .models import Project
+from .serializers import ProjectListSerializer
+
+class ProjectViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = Project.objects.all()
+    serializer_class = ProjectListSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        # Filter projects to only those assigned to the logged-in user
+        user = self.request.user
+        return Project.objects.filter(users=user)
+
+	•	get_queryset(): Filters the Project queryset to only include projects that have the logged-in user assigned.
+	•	ReadOnlyModelViewSet: This is used because we only need to support GET requests for listing and retrieving projects.
+
+3. URL Configuration
+
+In api/urls.py, register the ProjectViewSet to expose the /projects/ endpoint:
+
+from rest_framework.routers import DefaultRouter
+from .views import ProjectViewSet
+
+router = DefaultRouter()
+router.register(r'projects', ProjectViewSet, basename='project')
+
+urlpatterns = router.urls
+
+This will automatically generate the GET /projects/ endpoint.
+
+4. Testing the GET Request
+
+To retrieve the list of all projects assigned to the logged-in user, make a GET request to /projects/.
+
+Example Using cURL:
+
+curl -X GET http://localhost:8000/api/projects/ \
+-H "Authorization: Token <your_token>"
+
+5. Expected Output (Response)
+
+The response will return a list of projects that the logged-in user is assigned to:
+
+[
+    {
+        "id": 1,
+        "name": "Project A",
+        "created_at": "2019-12-24T11:03:55.931739+05:30",
+        "created_by": "Ganesh"
+    },
+    {
+        "id": 2,
+        "name": "Project B",
+        "created_at": "2020-01-15T14:10:22.121212+05:30",
+        "created_by": "Rohit"
+    }
+]
+
+Summary:
+
+	•	The GET /projects/ endpoint will list all the projects assigned to the currently logged-in user.
+	•	Each project includes its id, name, created_at timestamp, and the created_by username.
+	•	The queryset is filtered to only return projects where the logged-in user is assigned.
