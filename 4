@@ -1,0 +1,72 @@
+To implement the PUT and PATCH /clients/:id endpoint for updating a client’s information, follow these steps:
+
+Steps to Implement
+
+1. ClientSerializer
+
+Since we already have a ClientSerializer that handles both serialization and deserialization, no additional changes are required for the serializer. The serializer will handle both PUT and PATCH requests using the same logic.
+
+If you don’t have a basic serializer, here’s how the ClientSerializer looks:
+
+from rest_framework import serializers
+from .models import Client
+
+class ClientSerializer(serializers.ModelSerializer):
+    created_by = serializers.CharField(source='created_by.username', read_only=True)
+
+    class Meta:
+        model = Client
+        fields = ['id', 'name', 'created_at', 'created_by', 'updated_at']
+        extra_kwargs = {
+            'created_at': {'read_only': True},
+            'created_by': {'read_only': True},
+            'updated_at': {'read_only': True}
+        }
+
+	•	extra_kwargs: Ensures that created_at, created_by, and updated_at fields are read-only and can’t be modified through the API.
+
+2. Handling PUT and PATCH Requests in ViewSet
+
+In api/views.py, the ClientViewSet already inherits from ModelViewSet, which provides update (for PUT) and partial_update (for PATCH) methods by default.
+
+from rest_framework import viewsets
+from rest_framework.permissions import IsAuthenticated
+from .models import Client
+from .serializers import ClientSerializer
+
+class ClientViewSet(viewsets.ModelViewSet):
+    queryset = Client.objects.all()
+    serializer_class = ClientSerializer
+    permission_classes = [IsAuthenticated]
+
+    def perform_update(self, serializer):
+        # Automatically update the `updated_at` field
+        serializer.save()
+
+	•	perform_update(): The ModelViewSet automatically handles the PUT and PATCH methods, so there’s no need to override it unless you want additional logic.
+
+3. Testing PUT and PATCH Requests
+
+You can test this using PUT (for a full update) or PATCH (for a partial update) requests.
+
+Example 1: Using PUT (Full Update)
+
+curl -X PUT http://localhost:8000/api/clients/3/ \
+-H "Content-Type: application/json" \
+-H "Authorization: Token <your_token>" \
+-d '{"name": "company A"}'
+
+	•	This request would update the entire object. Since we only pass the name field, it will replace all other fields not specified with their default values (or potentially delete them if not handled carefully).
+
+Example 2: Using PATCH (Partial Update)
+
+curl -X PATCH http://localhost:8000/api/clients/3/ \
+-H "Content-Type: application/json" \
+-H "Authorization: Token <your_token>" \
+-d '{"name": "company A"}'
+
+	•	This request will partially update the client. In this case, it only changes the name field, while keeping the other fields intact (e.g., created_at, created_by).
+
+4. Expected Output (Response)
+
+Both PUT and PATCH will return
