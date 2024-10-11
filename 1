@@ -1,0 +1,105 @@
+To build the REST API that provides a list of all clients as requested, you would need to implement a GET /clients/ endpoint that returns a list of clients with the fields: id, client_name, created_at, and created_by.
+
+Steps to Build the API
+
+	1.	Update the Client Model
+Add a created_by field to the Client model to track who created the client.
+
+from django.db import models
+from django.contrib.auth.models import User
+
+class Client(models.Model):
+    name = models.CharField(max_length=100)
+    email = models.EmailField(unique=True)
+    phone = models.CharField(max_length=15, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='created_clients')
+
+    def __str__(self):
+        return self.name
+
+	•	created_by: This field uses a foreign key relationship with Django’s User model. It represents the user who created the client.
+
+	2.	Serializer for Client
+
+You need to modify the ClientSerializer to include created_by and format it to display the creator’s name instead of the User ID.
+
+from rest_framework import serializers
+from .models import Client
+
+class ClientSerializer(serializers.ModelSerializer):
+    created_by = serializers.CharField(source='created_by.username', read_only=True)
+
+    class Meta:
+        model = Client
+        fields = ['id', 'name', 'created_at', 'created_by']
+
+	•	created_by.username: This field returns the username of the user who created the client.
+
+	3.	Client ViewSet
+
+In the ClientViewSet, the list action will handle the GET /clients/ request and return the list of all clients:
+
+from rest_framework import viewsets
+from .models import Client
+from .serializers import ClientSerializer
+from rest_framework.permissions import IsAuthenticated
+
+class ClientViewSet(viewsets.ModelViewSet):
+    queryset = Client.objects.all()
+    serializer_class = ClientSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return Client.objects.all().order_by('id')
+
+	•	get_queryset(): Fetches all clients, ordered by their id.
+
+	4.	Routing
+
+In api/urls.py, ensure that the endpoint for clients is properly routed.
+
+from rest_framework.routers import DefaultRouter
+from .views import ClientViewSet
+
+router = DefaultRouter()
+router.register(r'clients', ClientViewSet)
+
+urlpatterns = router.urls
+
+	5.	Sample Output Format
+
+Once the API is implemented, the response for a GET /clients/ request should look like this:
+
+[
+    {
+        "id": 1,
+        "name": "Nimap",
+        "created_at": "2019-12-24T11:03:55.931739+05:30",
+        "created_by": "Rohit"
+    },
+    {
+        "id": 2,
+        "name": "Infotech",
+        "created_at": "2019-12-24T11:03:55.931739+05:30",
+        "created_by": "Rohit"
+    }
+]
+
+Explanation:
+
+	•	id: The primary key of the client.
+	•	name: The name of the client.
+	•	created_at: The date and time when the client was created (in ISO 8601 format).
+	•	created_by: The name of the user who created the client.
+
+Testing the API
+
+You can use Postman or cURL to test the GET /clients/ endpoint.
+
+curl -X GET http://localhost:8000/api/clients/ -H "Authorization: Token <your_token>"
+
+This setup ensures that you have a REST API to list all clients with relevant details as requested.
+
+
+
