@@ -1,0 +1,93 @@
+To implement the POST /clients/:id/projects/ endpoint for creating a new project under a specific client and assigning existing users to it, follow these steps:
+
+Steps to Implement
+
+1. Update the Project Model
+
+Ensure the Project model has a relationship to both Client and User. This allows us to assign a project to a client and assign multiple users to a project.
+
+from django.db import models
+from django.contrib.auth.models import User
+
+class Client(models.Model):
+    name = models.CharField(max_length=100)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='created_clients')
+
+    def __str__(self):
+        return self.name
+
+class Project(models.Model):
+    name = models.CharField(max_length=100)
+    client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name='projects')
+    users = models.ManyToManyField(User, related_name='projects')
+    created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='created_projects')
+
+    def __str__(self):
+        return self.name
+
+	•	client: Foreign key to the Client model, indicating which client the project belongs to.
+	•	users: Many-to-many relationship with the User model, allowing multiple users to be assigned to the project.
+
+2. Create Project Serializer
+
+Create a ProjectSerializer that handles project creation, including adding existing users by their id.
+
+from rest_framework import serializers
+from .models import Project, Client
+from django.contrib.auth.models import User
+
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['id', 'username']
+
+class ProjectSerializer(serializers.ModelSerializer):
+    client = serializers.CharField(source='client.name', read_only=True)
+    users = UserSerializer(many=True, read_only=True)
+    user_ids = serializers.PrimaryKeyRelatedField(queryset=User.objects.all(), many=True, write_only=True, source='users')
+
+    class Meta:
+        model = Project
+        fields = ['id', 'name', 'client', 'users', 'user_ids', 'created_at', 'created_by']
+        extra_kwargs = {
+            'created_by': {'read_only': True},
+            'created_at': {'read_only': True},
+        }
+
+    def create(self, validated_data):
+        client_id = self.context['client_id']
+        client = Client.objects.get(id=client_id)
+        user_ids = validated_data.pop('users')
+        project = Project.objects.create(client=client, name=validated_data['name'], created_by=self.context['request'].user)
+        project.users.set(user_ids)
+        return project
+
+	•	user_ids: This field is for writing (input). It allows adding users by their IDs.
+	•	users: This field is for reading (output), providing detailed user info (id, username).
+	•	client_id: Extracted from the URL and used to associate the project with the client.
+
+3. Create the View for Project Creation
+
+In api/views.py, add a method for handling the project creation under a specific client. We will extend the ClientViewSet to include a custom action for creating projects.
+
+from rest_framework import viewsets, status
+from rest_framework.response import Response
+from rest_framework.decorators import action
+from .models import Client, Project
+from .serializers import ClientSerializer, ProjectSerializer
+
+class ClientViewSet(viewsets.ModelViewSet):
+    queryset = Client.objects.all()
+    serializer_class = ClientSerializer
+    permission_classes = [IsAuthenticated]
+
+    @action(detail=True, methods=['post'], url_path='projects')
+    def create_project(self, request, pk=None):
+        client = self.get_object()
+        serializer = ProjectSerializer(data=request.data, context={'request': request, 'client_id': client.id})
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201
